@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#f7c92b"><meta name="mobile-web-app-capable" content="yes"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<title>ซื้ออะไรดี</title>
+<style>
+:root{--bg:#fffbe3;--card:#fffef6;--tx:#4a4126;--mut:#8f8760;--ac:#f7c92b;--ac2:#fff1a8;--wr:#d9534f;--bd:#f3e6a3;--on:#4a3a00;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media(prefers-color-scheme:dark){:root{color-scheme:light}}
+:root{color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:"Sarabun","Noto Sans Thai",system-ui,sans-serif;font-size:16px}
+#app{max-width:560px;margin:0 auto;padding:12px 12px 90px}
+h1{font-size:20px;margin:6px 2px 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:10px}
+textarea,input{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px}
+textarea{min-height:70px;resize:vertical}
+button{font:inherit;border:0;border-radius:10px;padding:10px 14px;background:var(--ac);color:var(--on);font-weight:600;cursor:pointer}
+button.g{background:var(--bg);color:var(--tx);border:1px solid var(--bd)}
+button.s{padding:6px 10px;font-size:14px}
+.row{display:flex;gap:8px;align-items:center}
+.cnt{font-size:18px;margin-bottom:10px;text-align:center;padding:8px;border-radius:12px;border:2px solid var(--ac);background:var(--ac2)}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sum div{background:var(--ac2);border-radius:12px;padding:10px}
+.sum small{color:var(--mut);display:block}
+.sum b{font-size:22px}
+.it{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--bd)}
+.it:first-child{border-top:0}
+.chk{width:34px;height:34px;border-radius:50%;padding:0;background:var(--bg);color:var(--on);border:2px solid var(--ac);flex:none}
+.done .chk{background:var(--ac)}
+.done .nm{text-decoration:line-through;color:var(--mut)}
+.it .info{flex:1;min-width:0}
+.mut{color:var(--mut);font-size:14px}
+.warn{color:var(--wr)}
+.x{background:none;color:var(--mut);padding:6px;font-size:20px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;border-radius:0;background:none;color:var(--mut);padding:14px}
+nav button.on{color:var(--tx);font-weight:700;background:var(--ac2)}
+#ov{display:none;position:fixed;inset:0;background:#0007;align-items:center;justify-content:center;padding:20px;z-index:9}
+#ov .card{width:100%;max-width:360px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+</style></head><body>
+<div id="app"><h1>🛒 ซื้ออะไรดี</h1><div id="view"></div></div>
+<nav><button id="t1" onclick="go('main')">รายการซื้อ</button><button id="t2" onclick="go('set')">ตั้งราคา</button></nav>
+<div id="ov"><div class="card" id="ovc"></div></div>
+<datalist id="units"></datalist>
+<script>
+let S={prices:[],list:[]},tab='main',draft='',qm='';
+try{Object.assign(S,JSON.parse(localStorage.getItem('mkt')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('mkt',JSON.stringify(S))}catch(e){}};
+const AL={'โล':'กิโล','กก':'กิโล','กก.':'กิโล','กิโลกรัม':'กิโล'};
+const nu=u=>{u=(u||'').trim();return AL[u]||u};
+const key=(n,u)=>n.trim().toLowerCase()+'|'+nu(u);
+const fmt=n=>n.toLocaleString('th-TH',{maximumFractionDigits:2});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=id=>document.getElementById(id);
+const pr=it=>S.prices.find(p=>key(p.name,p.unit)===key(it.name,it.unit));
+const KU=['กิโลกรัม','กิโล','โล','กก.','กก','กรัม','ขีด','ถุง','ขวด','ลัง','แพ็ค','แพค','กล่อง','ฟอง','มัด','กำ','ชิ้น','ตัว','ห่อ','โหล','แผง','หวี','เม็ด','ซอง','กระป๋อง','ลิตร','ก้อน','แท่ง','ฝัก','แผ่น'].sort((a,b)=>b.length-a.length);
+const UR=new RegExp('(\\d\\s*)('+KU.map(k=>k.replace('.','\\.')).join('|')+')(?=[^\\s\\d])','g');
+const norm=t=>t.replace(/(\d+)\s*ครึ่ง/g,(m,n)=>+n+0.5).replace(/ครึ่ง/g,' 0.5 ').replace(UR,'$1$2 ');
+function parse(t){const out=[];norm(t).split(/[\n,]+/).forEach(ch=>{ch=ch.trim();if(!ch)return;
+const re=/([^\d\s][^\d]*?)\s*(\d+(?:\.\d+)?)\s*([^\s\d]*)/g;let m,any=false;
+while((m=re.exec(ch))){any=true;out.push({name:m[1].trim(),qty:+m[2],unit:nu(m[3])})}
+if(!any)out.push({name:ch,qty:1,unit:''})});return out}
+function add(){const v=$('inp').value;draft='';
+parse(v).forEach((x,i)=>S.list.push({id:Date.now()+i,name:x.name,qty:x.qty,unit:x.unit,done:false}));save();render()}
+function tog(id){const it=S.list.find(x=>x.id===id);it.done=!it.done;save();render()}
+function del(id){S.list=S.list.filter(x=>x.id!==id);save();render()}
+function clr(all){if(all&&S.list.length){$('ovc').innerHTML='<b>ล้างรายการทั้งหมด?</b><div class="mut" style="margin:4px 0 10px">รายการที่ซื้อทั้งหมดจะหายไป (ราคาที่ตั้งไว้ไม่หาย)</div><div class="row"><button class="g" onclick="$(\'ov\').style.display=\'none\'">ยกเลิก</button><button onclick="clr2()">ล้างเลย</button></div>';$('ov').style.display='flex';return}S.list=all?[]:S.list.filter(x=>!x.done);save();render()}
+function clr2(){S.list=[];save();$('ov').style.display='none';render()}
+function go(t){tab=t;render()}
+function ask(id){const it=S.list.find(x=>x.id===id);
+$('ovc').innerHTML=`<b>ราคาของ ${esc(it.name)}</b><div class="mut" style="margin:4px 0 10px">ราคาต่อ 1 ${esc(it.unit||'หน่วย')}</div><input id="pv" type="number" inputmode="decimal" placeholder="บาท"><div class="row" style="margin-top:10px"><button class="g" onclick="$('ov').style.display='none'">ยกเลิก</button><button onclick="setP(${id})">บันทึก</button></div>`;
+$('ov').style.display='flex';setTimeout(()=>$('pv').focus(),50)}
+function setP(id){const it=S.list.find(x=>x.id===id),v=parseFloat($('pv').value);if(isNaN(v))return;
+S.prices.push({id:Date.now(),name:it.name,unit:it.unit,price:v});save();$('ov').style.display='none';render()}
+function addPrice(){const n=$('pn').value.trim(),u=nu($('pu').value),v=parseFloat($('pp').value);
+if(!n||isNaN(v))return void((n?$('pp'):$('pn')).style.borderColor='var(--wr)');
+const e=S.prices.find(p=>key(p.name,p.unit)===key(n,u));
+if(e)e.price=v;else S.prices.push({id:Date.now(),name:n,unit:u,price:v});save();render()}
+function quick(){const out=[],bad=[];
+norm($('qp').value).replace(/บาท|฿/g,'').split(/[\n,]+/).forEach(ch=>{ch=ch.trim();if(!ch)return;
+let m=ch.match(/^([^\d\s][^\d]*?)\s*(\d+(?:\.\d+)?)\s*([^\s\d]*)\s*(\d+(?:\.\d+)?)$/),n,q,u,p;
+if(m){n=m[1];q=+m[2];u=nu(m[3]);p=+m[4]}else{m=ch.match(/^([^\d\s][^\d]*?)\s*(\d+(?:\.\d+)?)$/);if(m){n=m[1];q=1;u='';p=+m[2]}}
+if(!m||!q){bad.push(ch);return}
+n=n.trim();p=p/q;
+const e=S.prices.find(x=>key(x.name,x.unit)===key(n,u));
+if(e)e.price=p;else S.prices.push({id:Date.now()+out.length,name:n,unit:u,price:p});
+out.push(n+' '+fmt(p)+' บาท/'+(u||'หน่วย'))});
+save();qm=(out.length?'บันทึกแล้ว: '+esc(out.join(', ')):'')+(bad.length?' <span class="warn">อ่านไม่ออก: '+esc(bad.join(', '))+'</span>':'');render()}
+function editP(id,v){const p=S.prices.find(x=>x.id===id);v=parseFloat(v);if(!isNaN(v)){p.price=v;save()}}
+function delP(id){S.prices=S.prices.filter(x=>x.id!==id);save();render()}
+function render(){
+$('t1').className=tab==='main'?'on':'';$('t2').className=tab==='set'?'on':'';
+$('units').innerHTML=[...new Set(['ชิ้น','ถุง','ขวด','กิโล','ลัง','แพ็ค','กล่อง','ฟอง','มัด',...S.prices.map(p=>p.unit).filter(Boolean)])].map(u=>`<option value="${esc(u)}">`).join('');
+if(tab==='main'){
+let all=0,left=0,miss=0;const rem=S.list.filter(x=>!x.done).length,tot=S.list.length;
+S.list.forEach(it=>{const p=pr(it);if(!p){miss++;return}const c=p.price*it.qty;all+=c;if(!it.done)left+=c});
+$('view').innerHTML=`<div class="card"><textarea id="inp" placeholder="พิมพ์รายการ เช่น มะนาว 1 ขวด พริกเผา 1 ถุง ไก่ 1 โล" oninput="draft=this.value">${esc(draft)}</textarea><button style="width:100%;margin-top:8px" onclick="add()">เพิ่มรายการ</button></div>
+<div class="card"><div class="cnt">${tot?(rem?'🛍️ เหลือ <b>'+rem+'</b> รายการ จาก '+tot+' รายการ':'🎉 ซื้อครบทั้ง '+tot+' รายการแล้ว'):'ยังไม่มีรายการ'}</div><div class="sum"><div><small>ประมาณทั้งหมด</small><b>฿${fmt(all)}</b></div><div><small>ต้องเตรียมเพิ่ม</small><b>฿${fmt(left)}</b></div></div>${miss?`<div class="mut warn" style="margin-top:8px">มี ${miss} รายการที่ยังไม่มีราคา (ยังไม่นับในยอด)</div>`:''}</div>
+<div class="card">${S.list.length?S.list.map(it=>{const p=pr(it);return`<div class="it ${it.done?'done':''}"><button class="chk" onclick="tog(${it.id})">${it.done?'✓':''}</button><div class="info"><div class="nm">${esc(it.name)} <b>${fmt(it.qty)}</b> ${esc(it.unit)}</div><div class="mut">${p?`฿${fmt(p.price)}/${esc(it.unit||'หน่วย')} → <b>฿${fmt(p.price*it.qty)}</b>`:`<button class="s g" onclick="ask(${it.id})">+ ใส่ราคา</button>`}</div></div><button class="x" onclick="del(${it.id})">×</button></div>`}).join('')+`<div class="row" style="margin-top:10px"><button class="g s" onclick="clr(false)">ล้างที่ซื้อแล้ว</button><button class="g s" onclick="clr(true)">ล้างทั้งหมด</button></div>`:'<div class="mut">ยังไม่มีรายการ</div>'}</div>`}
+else{
+const ps=[...S.prices].sort((a,b)=>a.name.localeCompare(b.name,'th'));
+$('view').innerHTML=`<div class="card"><b>พิมพ์ราคาเร็ว</b><div class="mut" style="margin:2px 0 8px">เช่น กุ้ง 1 กิโลกรัม 50 บาท (หลายรายการ ขึ้นบรรทัดใหม่หรือคั่นด้วย comma)</div><textarea id="qp" placeholder="กุ้ง 1 กิโลกรัม 50 บาท"></textarea><button style="width:100%;margin-top:8px" onclick="quick()">บันทึกราคา</button>${qm?`<div class="mut" style="margin-top:8px">${qm}</div>`:''}</div>
+<div class="card"><b>เพิ่ม/แก้ราคา (กรอกทีละช่อง)</b><div class="mut" style="margin:2px 0 8px">ชื่อกับหน่วยเดียวกัน = ทับราคาเดิม</div><input id="pn" placeholder="ชื่อสินค้า เช่น น้ำสลัด" style="margin-bottom:8px"><div class="grid"><input id="pu" list="units" placeholder="หน่วย เช่น ถุง, ลัง"><input id="pp" type="number" inputmode="decimal" placeholder="ราคาต่อ 1 หน่วย"></div><button style="width:100%;margin-top:8px" onclick="addPrice()">บันทึกราคา</button></div>
+<div class="card"><b>ราคาที่ตั้งไว้ (${ps.length})</b>${ps.map(p=>`<div class="it"><div class="info"><div>${esc(p.name)}</div><div class="mut">ต่อ 1 ${esc(p.unit||'หน่วย')}</div></div><input type="number" inputmode="decimal" value="${p.price}" style="width:90px" onchange="editP(${p.id},this.value)"><button class="x" onclick="delP(${p.id})">×</button></div>`).join('')||'<div class="mut" style="margin-top:6px">ยังไม่มีราคา</div>'}</div>`}}
+render();
+</script><script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
+</body></html>
